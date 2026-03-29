@@ -4,8 +4,9 @@ from pydantic import BaseModel, Field
 
 # 1. KHUÔN ĐÚC MỚI (Dành cho Debugger)
 class TomOutput(BaseModel):
-    diagnosis: str = Field(description="Chẩn đoán ngắn gọn (1 câu) nguyên nhân gốc rễ của lỗi hoặc mục tiêu cốt lõi.")
+    diagnosis: str = Field(description="Chẩn đoán ngắn gọn (1 câu) nguyên nhân gốc rễ.")
     plan: str = Field(description="Các bước hành động gạch đầu dòng ngắn gọn.")
+    required_libs: list[str] = Field(description="Danh sách thư viện cần cài (vd: ['pandas', 'requests']). Để trống [] nếu chỉ dùng thư viện chuẩn có sẵn của Python.") # [MỚI]
     code: str = Field(description="Mã Python thuần túy. KHÔNG bọc trong markdown.")
 
 def coder_node(state: SAOS_State) -> dict:
@@ -19,7 +20,25 @@ def coder_node(state: SAOS_State) -> dict:
     print(f"🔄 [LOOP {loop}/4] TOM'S EXECUTION LOG")
     print("="*40)
 
-    system_msg = "Bạn là Tom, một Senior Python Developer. Hãy viết code giải quyết vấn đề."
+    system_msg = """BẠN LÀ TOM - HỆ THỐNG TỰ TRỊ S-AOS.
+    
+    QUY TẮC SINH TỒN:
+    1. Kiểm tra kỹ xem code có dùng thư viện ngoài (requests, pandas, bs4,...) không.
+    2. Nếu CÓ, bạn BẮT BUỘC phải ghi tên thư viện đó vào danh sách `required_libs`. 
+       - Ví dụ: required_libs = ["requests", "pandas"]
+    3. Tuyệt đối không giải thích việc cài đặt trong code hay trong báo cáo. Hãy để hệ thống tự làm.
+    4. Nếu bạn thấy lỗi 'ModuleNotFoundError' trong lịch sử, đó là vì bạn ĐÃ QUÊN điền vào `required_libs`. Hãy sửa lỗi bằng cách ĐIỀN NÓ VÀO NGAY.
+    2. TRÌNH BÀY KẾT QUẢ (Stdout): 
+       - Kết quả in ra Terminal PHẢI được định dạng chuyên nghiệp.
+       - Sử dụng các đường kẻ ngang (==========) để phân tách các phần.
+       - Có tiêu đề rõ ràng cho từng loại dữ liệu.
+       - Nếu là dữ liệu số/danh sách, hãy dùng bảng hoặc bullet points.
+       - VÍ DỤ: 
+         ========== BÁO CÁO GIÁ BITCOIN ==========
+         - Nguồn: Coindesk API
+         - Giá hiện tại: 65,000 USD
+         =========================================
+    """
     if error:
         system_msg += f"\nLỖI LẦN TRƯỚC:\n{error}\nHãy đọc Traceback và sửa lỗi."
 
@@ -31,6 +50,7 @@ def coder_node(state: SAOS_State) -> dict:
     # In ra Terminal theo format chuẩn để copy-paste
     print(f"🔎 DIAGNOSIS: {response.diagnosis}")
     print(f"🛠️ PLAN: {response.plan}")
+    print(f"📦 LIBS: {response.required_libs}") # [MỚI] In ra cho dễ theo dõi
     print("-" * 40)
 
     new_history = history + [{
@@ -40,4 +60,5 @@ def coder_node(state: SAOS_State) -> dict:
         "error": error
     }]
 
-    return {"generated_code": response.code, "history": new_history}
+    # Trả về thêm danh sách thư viện
+    return {"generated_code": response.code, "history": new_history, "required_libs": response.required_libs}

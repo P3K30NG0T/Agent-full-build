@@ -5,31 +5,61 @@ from core.llm_config import llm
 def sandbox_node(state: SAOS_State) -> dict:
     print("🐳 [DOCKER] ĐANG KHỞI TẠO CONTAINER & CHẠY CODE...")
     code = state.get("generated_code", "")
+    libs = state.get("required_libs", []) # [MỚI] Rút danh sách thư viện
     current_loop = state.get("loop_count", 0)
     
     # [THAY TIM] Sử dụng hàm Docker chuẩn Enterprise
-    result = run_code_in_docker(code) 
+    result = run_code_in_docker(code, required_libs=libs) 
     
+# ... trong hàm sandbox_node
     if result["success"]:
         print("✅ [DOCKER STATUS] SUCCESS!")
         return {"execution_result": result["output"], "error_traceback": "", "loop_count": current_loop + 1}
     else:
         err_msg = result['error']
-        print(f"❌ [DOCKER STATUS] FAILED. Error snippet: {err_msg[:200]}...")
-        return {"execution_result": "", "error_traceback": result["error"], "loop_count": current_loop + 1}
+        print(f"❌ [DOCKER STATUS] FAILED. Lỗi: {err_msg[:100]}...")
+        # Cập nhật error_traceback ĐẦY ĐỦ để vòng lặp sau và Trạm báo cáo có cái để đọc
+        return {"execution_result": "", "error_traceback": err_msg, "loop_count": current_loop + 1}
 
 # ... (Giữ nguyên các hàm generate_report và should_continue ở bên dưới) ...
 
 def generate_report(state: SAOS_State, is_success: bool) -> str:
-    print("\n[📝] TOM ĐANG VIẾT BÁO CÁO TỔNG KẾT...")
-    history_str = "\n".join([f"Loop {h['loop']}: Lỗi '{h['error'][:50]}' -> Giải pháp: {h['action']}" for h in state['history']])
+    # Nếu dòng chữ này hiện lên, nghĩa là code mới ĐÃ ĂN
+    print("\n[📝] TRẠM KCS ĐANG TỔNG HỢP DEBUG LOG...") 
     
-    if is_success:
-        prompt = f"Code đã chạy thành công sau {state['loop_count']} lần. Lịch sử:\n{history_str}\nHãy tóm tắt cách bạn đã giải quyết, và đánh giá xem hệ thống tổng thể chạy đoạn code này thế nào. Trình bày ngắn gọn, rõ ràng."
-    else:
-        prompt = f"Code THẤT BẠI sau 4 lần thử. Lịch sử:\n{history_str}\nLỗi cuối cùng:\n{state['error_traceback']}\nHãy viết Post-Mortem Report: 1. Tóm tắt các lỗi gặp phải. 2. Phân tích nguyên nhân và cách bạn đã thử sửa từng loop. 3. Kết luận lý do thất bại cuối cùng và đề xuất giải pháp cho người dùng."
+    # 1. Trích xuất toàn bộ lỗi thô từ History
+    raw_errors = []
+    for item in state.get("history", []):
+        if item.get("error"):
+            # Lấy 500 ký tự cuối cùng của mỗi Traceback để tiết kiệm token
+            err_snippet = str(item['error'])[-500:] 
+            raw_errors.append(f"- Loop {item['loop']}:\n{err_snippet}")
+            
+    error_log_str = "\n".join(raw_errors) if raw_errors else "Không có lỗi (Chạy 1 phát ăn ngay)."
 
-    return llm.invoke([("human", prompt)]).content
+    status = "SUCCESS" if is_success else "FAILED"
+    
+    # 2. Prompt siêu tối giản, ép định dạng
+    prompt = f"""
+    Bạn là hệ thống System Admin của S-AOS. Hãy viết một báo cáo Debug NGẮN GỌN (tối đa 150 chữ).
+    
+    THÔNG TIN ĐẦU VÀO:
+    - Trạng thái cuối: {status}
+    - Số vòng lặp: {state.get("loop_count", 0)}
+    - Lịch sử Lỗi (Raw Traceback):
+    {error_log_str}
+    
+    YÊU CẦU BÁO CÁO:
+    Không chào hỏi. Không giải thích lằng nhằng. Trả về đúng 3 mục sau:
+    * STATUS: (Thành công ở vòng mấy / Thất bại)
+    * ROOT CAUSE: (Tên lỗi kỹ thuật hoặc dòng code gây lỗi)
+    * FIX APPLIED: (Hành động đã xử lý)
+    """
+    
+    from core.llm_config import llm # Đảm bảo đã import llm
+    messages = [("human", prompt)]
+    response = llm.invoke(messages)
+    return response.content
 
 # ... (Giữ nguyên phần sandbox_node) ...
 
