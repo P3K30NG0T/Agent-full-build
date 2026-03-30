@@ -1,48 +1,63 @@
-from orchestrator.state import SAOS_State
+import os
+import re
+from pydantic import BaseModel, Field
 from core.llm_config import llm
+from orchestrator.state import SAOS_State
+
+# 1. ĐÚC KHUNG BÁO CÁO (PYDANTIC)
+class ReportOutput(BaseModel):
+    status: str = Field(description="Ghi rõ 'SUCCESS (Vòng X)' hoặc 'FAILED'")
+    root_cause: str = Field(description="Nguyên nhân gốc rễ ngắn gọn (Ví dụ: Lỗi NameResolutionError do Docker mất mạng)")
+    action_taken: str = Field(description="Hành động đã làm để sửa (hoặc gợi ý cho user nếu thất bại)")
 
 def writer_node(state: SAOS_State) -> dict:
-    print("\n[📝] WRITER NODE ĐANG VIẾT BÁO CÁO TỔNG KẾT...")
+    print("\n[📝] WRITER NODE ĐANG TỔNG HỢP DEBUG LOG (Pydantic Mode)...")
+    code = state.get("generated_code", "")
+    prompt_text = state.get("user_prompt", "")
     
-    error = state.get("error_traceback", "")
-    is_success = not bool(error)
+    # --- PHẦN 1: XUẤT FILE ---
+    filename_match = re.search(r'([a-zA-Z0-9_/\\]+\.py)', prompt_text)
+    filepath = filename_match.group(1) if filename_match else "output_module.py"
     
-    # 1. Bóc tách lịch sử an toàn (Vá lỗi KeyError)
-    history_list = []
-    for h in state.get('history', []):
-        err_msg = str(h.get('error', ''))[:50]
-        act_msg = h.get('action', 'N/A')
-        history_list.append(f"Loop {h.get('loop', '?')}: Lỗi '{err_msg}' -> Giải pháp: {act_msg}")
+    folder = os.path.dirname(filepath)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
     
-    history_str = "\n".join(history_list)
-    
-    # 2. Phân loại kịch bản để viết Prompt
-    if is_success:
-        prompt = f"""Code đã chạy thành công sau {state.get('loop_count', 0)} lần. 
-        Lịch sử:
-        {history_str}
-        
-        Hãy tóm tắt cách bạn đã giải quyết, và đánh giá xem hệ thống tổng thể chạy đoạn code này thế nào. Trình bày ngắn gọn, rõ ràng."""
-        title = "BÁO CÁO THÀNH CÔNG"
-    else:
-        prompt = f"""Code THẤT BẠI sau 4 lần thử. 
-        Lịch sử:
-        {history_str}
-        Lỗi cuối cùng:
-        {error}
-        
-        Hãy viết Post-Mortem Report: 1. Tóm tắt các lỗi gặp phải. 2. Phân tích nguyên nhân và cách bạn đã thử sửa. 3. Đề xuất giải pháp."""
-        title = "BÁO CÁO THẤT BẠI (POST-MORTEM)"
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(code)
+    print(f"   [📦] Đã lưu file code tại: {filepath}")
 
-    # 3. Gọi LLM sinh báo cáo
-    report_content = llm.invoke([("human", prompt)]).content
-
-    # 4. In ấn đẹp đẽ ra Terminal
-    print("\n" + "="*60)
-    print(f"📋 {title}")
-    print("="*60)
-    print(report_content)
-    print("="*60 + "\n")
+    # --- PHẦN 2: ÉP KHUNG BÁO CÁO ---
+    raw_errors = []
+    for item in state.get("history", []):
+        if item.get("error"):
+            err_snippet = str(item['error'])[-300:] 
+            raw_errors.append(f"- Loop {item['loop']}:\n{err_snippet}")
+            
+    error_log_str = "\n".join(raw_errors) if raw_errors else "Không có lỗi."
     
-    # 5. Cập nhật State hợp lệ (Chỉ có Node mới được làm việc này)
-    return {"final_report": report_content}
+    prompt = f"""
+    Dựa vào lịch sử này, hãy điền vào Form báo cáo.
+    Số vòng lặp: {state.get("loop_count", 0)}
+    Lịch sử lỗi: {error_log_str}
+    """
+    
+    # Sử dụng Pydantic để ép LLM trả về đúng Object
+    structured_llm = llm.with_structured_output(ReportOutput)
+    report: ReportOutput = structured_llm.invoke([("human", prompt)])
+    
+    # In ra Terminal với format cố định (Không cho LLM tự vẽ format nữa)
+    report_string = f"""
+============================================================
+📋 BÁO CÁO KỸ THUẬT (DEBUG LOG)
+============================================================
+* STATUS     : {report.status}
+* ROOT CAUSE : {report.root_cause}
+* FIX/ACTION : {report.action_taken}
+============================================================
+"""
+    # Lưu vào state để hiển thị
+    state["final_report"] = report_string
+    print(report_string)
+    
+    return {"final_report": report_string}

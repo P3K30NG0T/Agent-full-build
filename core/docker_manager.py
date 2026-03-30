@@ -32,8 +32,8 @@ def run_code_in_docker(code_string, required_libs=None):
             remove=True,
             stdout=True,
             stderr=True,
-            network_mode='host'
-            #dns=['8.8.8.8']
+            #network_mode='host'
+            dns=['8.8.8.8', '1.1.1.1']
         )
         return {"success": True, "output": output_bytes.decode('utf-8')}
     # ... (giữ nguyên phần except và finally)

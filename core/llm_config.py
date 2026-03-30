@@ -6,7 +6,7 @@ load_dotenv()
 
 # BÍ KÍP NẰM Ở ĐÂY: Sử dụng thế hệ model mới nhất
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite", 
+    model="models/gemini-flash-latest", 
     temperature=0, 
     google_api_key=os.getenv("GEMINI_API_KEY")
 )

@@ -39,22 +39,23 @@ if __name__ == "__main__":
     
     # GIAO TASK: Bắt Tom tự xây Sandbox Docker cho tương lai!
     initial_state = {
-        "user_prompt": """Bạn là Tom, một Senior Python Developer. 
-    Nhiệm vụ của bạn là giải quyết yêu cầu và đảm bảo code CHẠY ĐƯỢC. Hãy lấy giá Bitcoin hiện tại từ Coindesk API. 
-        Sau đó, giả sử tôi có 0.5 BTC, hãy tính giá trị tài sản của tôi theo USD.
-        YÊU CẦU: Trình bày kết quả thật đẹp mắt, Hãy dùng thư viện rich để trình bày kết quả dưới dạng Table cho dễ đọc trong Terminal.
-    
-    QUY ĐỊNH BẮT BUỘC:
-    1. Nếu code của bạn sử dụng bất kỳ thư viện ngoài nào (như requests, pandas, openpyxl...), bạn PHẢI liệt kê tên thư viện đó vào danh sách `required_libs`.
-    2. Tuyệt đối không yêu cầu người dùng cài đặt thủ công. Hệ thống sẽ tự động cài chúng dựa trên danh sách bạn cung cấp.
-    3. "QUY ĐỊNH: Bạn PHẢI sử dụng lệnh print() để in kết quả cuối cùng ra màn hình (stdout). Nếu không in, hệ thống sẽ coi như nhiệm vụ thất bại.""",
-        "scratchpad": [], 
-        "task_type": "", 
-        "required_libs": [],
+        "user_prompt": """Hãy viết một đoạn code Python thực hiện phân tích dữ liệu giả lập.
+        YÊU CẦU:
+        1. Tạo một DataFrame bằng thư viện `pandas` chứa dữ liệu doanh thu của 3 cửa hàng:
+           - Store A: 500, 600, 750 (tháng 1, 2, 3)
+           - Store B: 400, 450, 400
+           - Store C: 800, 850, 900
+        2. Tính tổng doanh thu của từng cửa hàng.
+        3. Sử dụng thư viện `rich` để in một bảng (Table) thật đẹp báo cáo tổng doanh thu này.
+        4. KHÔNG DÙNG Internet, KHÔNG gọi API.""",
+        "generated_code": "",
         "execution_result": "",
         "error_traceback": "",
         "loop_count": 0,
-        "history": []
+        "history": [],
+        "required_libs": [],
+        "scratchpad": [],
+        "task_type": ""
     }
 
     # Tạo một biến để hứng State cuối cùng

@@ -5,20 +5,25 @@ from core.llm_config import llm
 def sandbox_node(state: SAOS_State) -> dict:
     print("🐳 [DOCKER] ĐANG KHỞI TẠO CONTAINER & CHẠY CODE...")
     code = state.get("generated_code", "")
-    libs = state.get("required_libs", []) # [MỚI] Rút danh sách thư viện
+    libs = state.get("required_libs", [])
     current_loop = state.get("loop_count", 0)
     
-    # [THAY TIM] Sử dụng hàm Docker chuẩn Enterprise
+    from core.docker_manager import run_code_in_docker
     result = run_code_in_docker(code, required_libs=libs) 
     
-# ... trong hàm sandbox_node
     if result["success"]:
         print("✅ [DOCKER STATUS] SUCCESS!")
         return {"execution_result": result["output"], "error_traceback": "", "loop_count": current_loop + 1}
     else:
         err_msg = result['error']
-        print(f"❌ [DOCKER STATUS] FAILED. Lỗi: {err_msg[:100]}...")
-        # Cập nhật error_traceback ĐẦY ĐỦ để vòng lặp sau và Trạm báo cáo có cái để đọc
+        
+        # [CẢI TIẾN HIỂN THỊ]: Lấy 300 ký tự cuối cùng của lỗi để in ra Terminal
+        # Điều này giúp bạn nhìn thấy chính xác Exception (VD: NameResolutionError) thay vì dòng Traceback vô nghĩa
+        display_err = err_msg[-300:].strip() if len(err_msg) > 300 else err_msg
+        
+        print(f"❌ [DOCKER STATUS] FAILED. Lỗi chi tiết:\n...{display_err}\n")
+        
+        # Vẫn trả nguyên vẹn toàn bộ lỗi gốc vào Khay hồ sơ để AI có đủ Context
         return {"execution_result": "", "error_traceback": err_msg, "loop_count": current_loop + 1}
 
 # ... (Giữ nguyên các hàm generate_report và should_continue ở bên dưới) ...
